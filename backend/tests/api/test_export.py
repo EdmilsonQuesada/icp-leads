@@ -14,10 +14,10 @@ def override_get_db():
     with Session(engine) as session:
         yield session
 
-app.dependency_overrides[get_db] = override_get_db
-
 @pytest.fixture(autouse=True)
 def setup_db():
+    # Registra o override específico deste módulo antes de cada teste
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         lead = Lead(
@@ -29,6 +29,7 @@ def setup_db():
         db.commit()
     yield
     Base.metadata.drop_all(engine)
+    app.dependency_overrides.pop(get_db, None)
 
 client = TestClient(app)
 
