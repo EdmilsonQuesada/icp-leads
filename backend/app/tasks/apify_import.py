@@ -103,64 +103,65 @@ def import_apify_results(self, dataset_id: str, search_job_id: int) -> Dict[str,
         imported_count = 0
         skipped_count = 0
 
-        # Process each post
+        # Process each post - extract post AUTHORS as leads
         for post in items:
             try:
-                # Extract post's author/creator username from the post data
-                # Note: Apify hashtag scraper may not always have owner data for free tier
-                # We'll work with what we have: extract from mentions if available
+                # Extract post author (ownerUsername is always available)
+                username = post.get("ownerUsername")
+                if not username:
+                    skipped_count += 1
+                    continue
 
-                post_id = post.get("id") or post.get("shortCode")
-                caption = post.get("caption", "")
-                post_url = post.get("url", "")
+                # Build lead data from post author
+                lead_data = {
+                    "username": username,
+                    "display_name": post.get("ownerFullName"),
+                    "profile_url": f"https://instagram.com/{username}",
+                    "bio": (post.get("caption") or "")[:500],  # Use caption as context
+                    "country": "BR",
+                    "is_business_account": False,
+                }
 
-                # Try to extract username from caption mentions or hashtags
-                # For now, we'll focus on comment authors since they're more explicit
+                # Enrich data (score, categorization)
+                enriched = enrich_lead_data(lead_data)
 
-                # Process comments (extract commenters as leads)
-                comments = post.get("latestComments", [])
-                if not comments and "comments" in post:
-                    comments = post.get("comments", [])
+                # Check if lead already exists
+                existing = db.query(Lead).filter(
+                    Lead.username == enriched["username"],
+                    Lead.platform == LeadPlatform.INSTAGRAM
+                ).first()
 
+                if not existing:
+                    lead = Lead(**enriched)
+                    db.add(lead)
+                    imported_count += 1
+                    logger.info(f"   + Lead: @{username}")
+                else:
+                    skipped_count += 1
+
+                # Also process latestComments if available (paid plans)
+                comments = post.get("latestComments") or []
                 for comment in comments:
-                    try:
-                        commenter = comment.get("owner", {}) if isinstance(comment, dict) else {}
-                        username = commenter.get("username") if isinstance(commenter, dict) else None
-
-                        if not username:
-                            # Try alternative field names
-                            username = comment.get("username") if isinstance(comment, dict) else None
-
-                        if username:
-                            lead_data = {
-                                "username": username,
-                                "display_name": commenter.get("name") if isinstance(commenter, dict) else None,
-                                "followers": commenter.get("followers") if isinstance(commenter, dict) else None,
-                                "profile_url": f"https://instagram.com/{username}",
-                                "bio": comment.get("text") if isinstance(comment, dict) else str(comment),
-                                "country": "BR",
-                                "is_business_account": False,
-                            }
-
-                            # Enrich data (gender, score, categorization)
-                            enriched = enrich_lead_data(lead_data)
-
-                            # Check if lead already exists
-                            existing = db.query(Lead).filter(
-                                Lead.username == enriched["username"],
-                                Lead.platform == LeadPlatform.INSTAGRAM
-                            ).first()
-
-                            if not existing:
-                                lead = Lead(**enriched)
-                                db.add(lead)
-                                imported_count += 1
-                            else:
-                                skipped_count += 1
-
-                    except Exception as e:
-                        logger.warning(f"Error processing comment: {e}")
+                    if not isinstance(comment, dict):
                         continue
+                    commenter = comment.get("ownerUsername") or comment.get("owner", {}).get("username")
+                    if commenter:
+                        c_lead_data = {
+                            "username": commenter,
+                            "display_name": comment.get("ownerFullName"),
+                            "profile_url": f"https://instagram.com/{commenter}",
+                            "bio": (comment.get("text") or "")[:500],
+                            "country": "BR",
+                            "is_business_account": False,
+                        }
+                        c_enriched = enrich_lead_data(c_lead_data)
+                        c_existing = db.query(Lead).filter(
+                            Lead.username == c_enriched["username"],
+                            Lead.platform == LeadPlatform.INSTAGRAM
+                        ).first()
+                        if not c_existing:
+                            db.add(Lead(**c_enriched))
+                            imported_count += 1
 
             except Exception as e:
                 logger.error(f"Error processing post {post.get('id')}: {e}")

@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.models.search_job import SearchJob
 from app.schemas.lead import SearchJobCreate
 from app.integrations.apify_client import ApifyClient
-from app.tasks.apify_import import import_apify_results
+from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -73,16 +73,17 @@ def search_instagram_apify(
         db.commit()
         logger.info(f"✅ SearchJob created with ID: {search_job.id}")
 
-        # Queue import task (temporarily commented out for testing)
-        # logger.info("→ Queuing import task...")
-        # import_apify_results.apply_async(
-        #     kwargs={
-        #         "dataset_id": run_result["dataset_id"],
-        #         "search_job_id": search_job.id,
-        #     },
-        #     countdown=15
-        # )
-        logger.info("✅ SearchJob ready for import (manual trigger needed)")
+        # Queue import task via celery_app.send_task
+        logger.info("→ Queuing import task...")
+        celery_app.send_task(
+            "app.tasks.apify_import.import_apify_results",
+            kwargs={
+                "dataset_id": run_result["dataset_id"],
+                "search_job_id": search_job.id,
+            },
+            countdown=15
+        )
+        logger.info("✅ Import task queued successfully")
 
         return {
             "job_id": search_job.id,

@@ -6,7 +6,7 @@ celery_app = Celery(
     "icp_leads",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.enrichment", "app.tasks.monitoring"],
+    include=["app.tasks.enrichment", "app.tasks.monitoring", "app.tasks.search", "app.tasks.apify_import"],
 )
 
 celery_app.conf.beat_schedule = {
