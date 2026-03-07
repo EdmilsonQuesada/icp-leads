@@ -39,47 +39,50 @@ def list_search_jobs(db: Session = Depends(get_db)):
     ]
 
 @router.post("/apify")
-async def search_instagram_apify(
+def search_instagram_apify(
     request: SearchJobCreate,
     db: Session = Depends(get_db),
 ):
     """
     Start Instagram search using Apify (new, reliable method)
-
-    Input: {"hashtags": ["constelacao"], "platforms": ["instagram"], "max_posts": 50}
+    Input: {"keywords": ["constelacao"], "platforms": ["instagram"]}
     """
     try:
+        logger.info(f"🚀 Starting Apify search with keywords: {request.keywords}")
+
+        # Initialize Apify client
         apify = ApifyClient()
+        logger.info("✅ ApifyClient initialized")
 
         # Start Apify run
+        logger.info("→ Calling apify.scrape_hashtags...")
         run_result = apify.scrape_hashtags(
             hashtags=request.keywords,
             max_posts_per_hashtag=50,
         )
+        logger.info(f"✅ Apify run started: {run_result['run_id']}")
 
         # Store run info in database for tracking
+        logger.info("→ Creating SearchJob...")
         search_job = SearchJob(
-            job_id=run_result["run_id"],
             keywords=request.keywords,
             platforms=request.platforms,
-            status="running",
-            metadata={
-                "apify_run_id": run_result["run_id"],
-                "apify_dataset_id": run_result["dataset_id"],
-                "source": "apify"
-            }
+            status="running"
         )
         db.add(search_job)
         db.commit()
+        logger.info(f"✅ SearchJob created with ID: {search_job.id}")
 
-        # Queue import task (will run after Apify completes ~10-20 seconds)
-        import_apify_results.apply_async(
-            kwargs={
-                "dataset_id": run_result["dataset_id"],
-                "search_job_id": search_job.id,
-            },
-            countdown=15  # Wait 15 seconds before importing (let Apify finish)
-        )
+        # Queue import task (temporarily commented out for testing)
+        # logger.info("→ Queuing import task...")
+        # import_apify_results.apply_async(
+        #     kwargs={
+        #         "dataset_id": run_result["dataset_id"],
+        #         "search_job_id": search_job.id,
+        #     },
+        #     countdown=15
+        # )
+        logger.info("✅ SearchJob ready for import (manual trigger needed)")
 
         return {
             "job_id": search_job.id,
@@ -88,5 +91,5 @@ async def search_instagram_apify(
         }
 
     except Exception as e:
-        logger.error(f"Error starting Apify search: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Error starting Apify search: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
