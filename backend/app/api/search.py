@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.models.search_job import SearchJob
 from app.schemas.lead import SearchJobCreate
 from app.integrations.apify_client import ApifyClient
+from app.tasks.apify_import import import_apify_results
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,15 @@ async def search_instagram_apify(
         )
         db.add(search_job)
         db.commit()
+
+        # Queue import task (will run after Apify completes ~10-20 seconds)
+        import_apify_results.apply_async(
+            kwargs={
+                "dataset_id": run_result["dataset_id"],
+                "search_job_id": search_job.id,
+            },
+            countdown=15  # Wait 15 seconds before importing (let Apify finish)
+        )
 
         return {
             "job_id": search_job.id,
