@@ -10,6 +10,8 @@ export const fetchLeadEvents = (id) => api.get(`/leads/${id}/events`);
 export const markContacted = (id) => api.patch(`/leads/${id}/contacted`);
 export const archiveLead = (id) => api.delete(`/leads/${id}`);
 export const createSearch = (data) => api.post("/search", data);
+export const searchApify = (data) => api.post("/search/apify", data);
+export const fetchSearchJobs = () => api.get("/search");
 export const exportCsv = () => api.get("/export/csv", { responseType: "blob" });
 export const exportExcel = () => api.get("/export/excel", { responseType: "blob" });
 export const fetchNotifications = () => api.get("/notifications");

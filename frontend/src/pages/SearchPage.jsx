@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createSearch, fetchSearchJobs } from "../api/client";
+import { createSearch, searchApify, fetchSearchJobs } from "../api/client";
 
 const STATUS_PT = { queued: "Na fila", running: "Executando...", done: "Concluído", error: "Erro" };
 const STATUS_COLOR = {
@@ -45,22 +45,11 @@ export function SearchPage() {
 
       if (method === "apify") {
         // Novo endpoint Apify
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
-        const response = await fetch(`${apiUrl}/search/apify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            hashtags: kws,
-            platforms: plts,
-            max_posts: 50,
-          })
+        res = await searchApify({
+          hashtags: kws,
+          platforms: plts,
+          max_posts: 50,
         });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        res = { data: await response.json() };
       } else {
         // Legacy instagrapi endpoint
         res = await createSearch({ keywords: kws, platforms: plts });
