@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.integrations.apify_client import ApifyClient
 from app.models.lead import Lead, LeadStatus, LeadCategory, LeadPlatform, LeadGender
+from app.models.search_job import SearchJob
 from app.services.scorer import LeadScorer
 from app.services.gender_detector import detect_gender
 
@@ -201,6 +202,15 @@ def import_apify_results(self, dataset_id: str, search_job_id: int) -> Dict[str,
                 continue
 
         db.commit()
+
+        # Atualiza SearchJob como concluído
+        job = db.get(SearchJob, search_job_id)
+        if job:
+            job.status = "done"
+            job.leads_found = imported_count
+            job.finished_at = datetime.utcnow()
+            db.commit()
+
         logger.info(f"✅ Import complete: {imported_count} new, {skipped_count} skipped")
 
         return {
@@ -211,6 +221,16 @@ def import_apify_results(self, dataset_id: str, search_job_id: int) -> Dict[str,
 
     except Exception as e:
         logger.error(f"❌ Error importing Apify results: {e}")
+        # Marca job como erro
+        try:
+            job = db.get(SearchJob, search_job_id)
+            if job:
+                job.status = "error"
+                job.error_message = str(e)
+                job.finished_at = datetime.utcnow()
+                db.commit()
+        except Exception:
+            pass
         db.rollback()
         # Retry with exponential backoff
         raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))

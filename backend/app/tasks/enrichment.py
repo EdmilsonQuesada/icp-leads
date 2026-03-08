@@ -60,7 +60,6 @@ def enrich_lead(lead_id: int):
         lead.score_intention = result.intention_score
         lead.score_profile = result.profile_score
         lead.category = LeadCategory(result.category)
-        lead.status = LeadStatus.MONITORING
 
         # Detecção de gênero via nome
         if not lead.gender:
@@ -71,6 +70,9 @@ def enrich_lead(lead_id: int):
         days = MONITOR_DAYS.get(result.category, 15)
         if days > 0:
             lead.monitor_until = datetime.utcnow() + timedelta(days=days)
+            lead.status = LeadStatus.MONITORING
+        else:
+            lead.status = LeadStatus.ARCHIVED
 
         db.add(LeadEvent(
             lead_id=lead.id,
