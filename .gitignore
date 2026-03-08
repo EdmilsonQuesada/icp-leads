@@ -23,3 +23,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Instagram session (contém cookies/tokens sensíveis — nunca commitar)
+backend/instagram_session.json
+instagram_session.json

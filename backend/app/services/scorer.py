@@ -1,17 +1,43 @@
 from dataclasses import dataclass
 
 INTENTION_KEYWORDS = [
+    # intenção explícita de contratar/agendar
     "quero fazer sessão", "quero agendar", "como faço sessão",
-    "onde encontro terapeuta", "preciso de ajuda", "como funciona",
-    "quero participar", "onde agendar", "quanto custa sessão",
+    "onde encontro terapeuta", "onde agendar", "quanto custa",
     "quero marcar", "como me inscrevo", "quero uma sessão",
-    "quero sessão", "agendar sessão",
+    "quero sessão", "agendar sessão", "como faço para",
+    # busca ativa por ajuda
+    "preciso de ajuda", "preciso muito", "estou precisando",
+    "estou sofrendo", "estou passando por", "situação difícil",
+    "não sei o que fazer", "alguém me ajuda", "por favor me ajuda",
+    "quero tentar", "vou tentar", "vou fazer",
+    # interesse genuíno / experiência positiva
+    "me ajudou muito", "mudou minha vida", "transformou",
+    "quero participar", "participei", "fiz a constelação",
+    "fiz uma sessão", "já fiz", "tenho vontade", "tenho interesse",
+    "onde posso fazer", "como funciona", "quero saber mais",
+    "gostaria de fazer", "gostaria de participar",
+    # expressão emocional de busca
+    "preciso curar", "quero curar", "busco cura",
+    "busco paz", "quero paz", "quero me libertar",
+    "estou buscando", "estou procurando ajuda",
+]
+
+NEGATIVE_KEYWORDS = [
+    "é vudu", "e vudu", "é diabo", "e diabo", "coisa do diabo",
+    "é satânico", "e satanico", "é macumba", "e macumba",
+    "é mentira", "e mentira", "é fraude", "e fraude",
+    "é charlatanice", "pseudociência", "pseudociencia",
+    "não acredito", "nao acredito", "balela", "bobagem",
+    "não funciona", "nao funciona", "enganação", "enganacao",
+    "não vale", "nao vale", "perda de tempo",
 ]
 
 SPIRITUAL_BIO_KEYWORDS = [
     "terapia", "autoconhecimento", "cura", "espiritualidade",
     "constelação", "meditação", "yoga", "ayurveda", "xamanismo",
     "alma", "despertar", "consciência", "equilíbrio", "holístico",
+    "psicologia", "terapeuta", "coach", "desenvolvimento pessoal",
 ]
 
 @dataclass
@@ -46,12 +72,18 @@ class LeadScorer:
         score += min(variety * 2, 6)
         return min(score, 40)
 
+    def _is_negative(self, text: str) -> bool:
+        text = text.lower()
+        return any(kw in text for kw in NEGATIVE_KEYWORDS)
+
     def _calc_intention(self, comments: list[dict]) -> int:
         if not comments:
             return 0
         score = 0
         for comment in comments:
             text = comment.get("text", "").lower()
+            if self._is_negative(text):
+                continue
             for kw in INTENTION_KEYWORDS:
                 if kw in text:
                     score += 15

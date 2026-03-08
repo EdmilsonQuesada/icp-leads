@@ -24,6 +24,11 @@ class LeadOut(BaseModel):
     created_at: datetime
     last_monitored_at: datetime | None = None
     contacted_at: datetime | None = None
+    # Campos FASE 2.1
+    gender: str | None = None
+    gender_confidence: int | None = None
+    message_date: datetime | None = None
+    creator_profile: str | None = None
 
     class Config:
         from_attributes = True

@@ -5,6 +5,7 @@ const api = axios.create({
 });
 
 export const fetchLeads = (params) => api.get("/leads", { params });
+export const fetchCities = () => api.get("/leads/cities");
 export const fetchLead = (id) => api.get(`/leads/${id}`);
 export const fetchLeadEvents = (id) => api.get(`/leads/${id}/events`);
 export const markContacted = (id) => api.patch(`/leads/${id}/contacted`);

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import distinct
 from datetime import datetime
 from app.db.session import get_db
 from app.models.lead import Lead, LeadStatus
@@ -7,12 +8,24 @@ from app.schemas.lead import LeadOut, LeadList
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
+@router.get("/cities")
+def list_cities(db: Session = Depends(get_db)):
+    """Retorna lista de cidades distintas que têm ao menos um lead."""
+    rows = (
+        db.query(distinct(Lead.city))
+        .filter(Lead.city.isnot(None), Lead.city != "")
+        .order_by(Lead.city)
+        .all()
+    )
+    return [r[0] for r in rows]
+
 @router.get("", response_model=LeadList)
 def list_leads(
     category: str | None = None,
     platform: str | None = None,
     status: str | None = None,
     city: str | None = None,
+    gender: str | None = None,
     birthday_soon: bool = False,
     skip: int = 0,
     limit: int = 50,
@@ -27,6 +40,8 @@ def list_leads(
         query = query.filter(Lead.status == status)
     if city:
         query = query.filter(Lead.city.ilike(f"%{city}%"))
+    if gender:
+        query = query.filter(Lead.gender == gender)
     if birthday_soon:
         from datetime import date, timedelta
         today = date.today()

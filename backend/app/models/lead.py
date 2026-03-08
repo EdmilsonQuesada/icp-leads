@@ -8,6 +8,11 @@ class LeadPlatform(str, enum.Enum):
     INSTAGRAM = "instagram"
     YOUTUBE = "youtube"
 
+class LeadGender(str, enum.Enum):
+    F = "F"
+    M = "M"
+    ND = "ND"
+
 class LeadCategory(str, enum.Enum):
     QUENTE = "quente"
     MORNO = "morno"
@@ -42,6 +47,11 @@ class Lead(Base):
     followers: Mapped[int | None] = mapped_column(Integer)
     following: Mapped[int | None] = mapped_column(Integer)
     is_business_account: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    gender: Mapped[LeadGender | None] = mapped_column(Enum(LeadGender), nullable=True)
+    gender_confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-100
+    message_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    creator_profile: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     score: Mapped[int] = mapped_column(Integer, default=0)
     score_engagement: Mapped[int] = mapped_column(Integer, default=0)

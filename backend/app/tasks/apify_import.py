@@ -2,13 +2,15 @@
 Celery task to import data from Apify and create leads
 """
 import logging
+from datetime import datetime
 from typing import List, Dict, Any
 from celery import shared_task
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.integrations.apify_client import ApifyClient
-from app.models.lead import Lead, LeadStatus, LeadCategory, LeadPlatform
+from app.models.lead import Lead, LeadStatus, LeadCategory, LeadPlatform, LeadGender
 from app.services.scorer import LeadScorer
+from app.services.gender_detector import detect_gender
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +56,16 @@ def enrich_lead_data(lead_data: Dict[str, Any]) -> Dict[str, Any]:
         score_intention = result.intention_score
         score_profile = result.profile_score
 
+    # Detecção de gênero
+    display_name = lead_data.get("display_name")
+    username = lead_data.get("username", "")
+    gender_val, gender_conf = detect_gender(display_name or username)
+
     # Return enriched lead data
     return {
-        "username": lead_data["username"],
+        "username": username,
         "platform": LeadPlatform.INSTAGRAM,
-        "display_name": lead_data.get("display_name"),
+        "display_name": display_name,
         "bio": lead_data.get("bio"),
         "profile_url": lead_data.get("profile_url"),
         "avatar_url": lead_data.get("avatar_url"),
@@ -72,6 +79,10 @@ def enrich_lead_data(lead_data: Dict[str, Any]) -> Dict[str, Any]:
         "score_profile": score_profile,
         "category": category,
         "status": status,
+        "gender": LeadGender(gender_val),
+        "gender_confidence": gender_conf,
+        "message_date": lead_data.get("message_date"),
+        "creator_profile": lead_data.get("creator_profile"),
     }
 
 
@@ -112,6 +123,25 @@ def import_apify_results(self, dataset_id: str, search_job_id: int) -> Dict[str,
                     skipped_count += 1
                     continue
 
+                # Extrair data do post (timestamp vem como ISO string ou epoch)
+                raw_ts = post.get("timestamp")
+                msg_date = None
+                if raw_ts:
+                    try:
+                        if isinstance(raw_ts, (int, float)):
+                            msg_date = datetime.utcfromtimestamp(raw_ts)
+                        else:
+                            msg_date = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00")).replace(tzinfo=None)
+                    except Exception:
+                        pass
+
+                # Extrair hashtag/creator_profile como referência de origem
+                hashtags = post.get("hashtags") or []
+                creator_ref = (
+                    f"#{hashtags[0]}" if hashtags
+                    else post.get("locationName") or "apify/instagram"
+                )
+
                 # Build lead data from post author
                 lead_data = {
                     "username": username,
@@ -120,6 +150,8 @@ def import_apify_results(self, dataset_id: str, search_job_id: int) -> Dict[str,
                     "bio": (post.get("caption") or "")[:500],  # Use caption as context
                     "country": "BR",
                     "is_business_account": False,
+                    "message_date": msg_date,
+                    "creator_profile": creator_ref,
                 }
 
                 # Enrich data (score, categorization)
