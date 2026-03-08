@@ -2,6 +2,7 @@
 Wrapper around Apify SDK for Instagram scraping
 """
 import logging
+import unicodedata
 from typing import Optional, List, Dict, Any
 from apify_client import ApifyClient as ApifySDK
 from app.core.config import settings
@@ -37,7 +38,9 @@ class ApifyClient:
         Returns:
             Dict with run_id, dataset_id, and status
         """
-        clean_hashtags = [h.lstrip("#") for h in hashtags]
+        clean_hashtags = [self._normalize_hashtag(h) for h in hashtags]
+        # Remover vazios após normalização
+        clean_hashtags = [h for h in clean_hashtags if h]
 
         run_input = {
             "hashtags": clean_hashtags,
@@ -64,6 +67,23 @@ class ApifyClient:
         except Exception as e:
             self.logger.error(f"❌ Error starting Apify run: {e}")
             raise
+
+    @staticmethod
+    def _normalize_hashtag(keyword: str) -> str:
+        """
+        Normaliza keyword para uso como hashtag do Instagram/Apify.
+        Remove #, acentos, espaços e caracteres especiais.
+        Ex: "constelação familiar" → "constelacaofamiliar"
+            "#Sistêmica" → "sistemica"
+        """
+        # Remove # inicial
+        keyword = keyword.lstrip("#").strip()
+        # Remove acentos (NFD → mantém só letras base)
+        keyword = unicodedata.normalize("NFD", keyword)
+        keyword = "".join(c for c in keyword if unicodedata.category(c) != "Mn")
+        # Remove espaços e caracteres especiais (mantém apenas letras e dígitos)
+        keyword = "".join(c for c in keyword if c.isalnum())
+        return keyword.lower()
 
     def get_run_status(self, run_id: str) -> Dict[str, Any]:
         """Get status of a running actor"""

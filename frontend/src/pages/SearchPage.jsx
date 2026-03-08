@@ -46,9 +46,8 @@ export function SearchPage() {
       if (method === "apify") {
         // Novo endpoint Apify
         res = await searchApify({
-          hashtags: kws,
+          keywords: kws,
           platforms: plts,
-          max_posts: 50,
         });
       } else {
         // Legacy instagrapi endpoint
